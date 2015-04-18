@@ -1,0 +1,2 @@
+# SmallCartography
+MapReduce in Python
