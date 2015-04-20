@@ -1,13 +1,12 @@
 
-__all__ = ["config", "pageserver", "restful", "worker"]
+__all__ = ["config", "pageserver", "restful"]
 
 import config
 import pageserver
 import restful
-import worker
 
 
-def run(host, port):
+def run(host, port, ns_host, ns_port):
     """
 
     Runs the server.
