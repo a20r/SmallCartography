@@ -19,5 +19,5 @@ def run(host, port, ns_host, ns_port, name):
     """
     hb = heart.Heart(name, host, port, ns_host, ns_port, 1)
     hb.register()
-    # hb.start()
-    # config.app.run(host=host, port=int(port), debug=True, use_reloader=False)
+    hb.start()
+    config.app.run(host=host, port=int(port), debug=True, use_reloader=False)

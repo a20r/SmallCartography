@@ -23,7 +23,7 @@ class Heart(object):
             "name": self.name,
             "host": self.host,
             "port": self.port,
-            "type": "mapper"
+            "type": "reducer"
         }
 
         r = requests.post(route, data=payload)

@@ -37,7 +37,10 @@ class Worker(object):
         return self
 
     def still_alive(self, mbt):
-        return time.time() - self.last_time <= mbt
+        return time.time() - self.last_update <= mbt
+
+    def get_address(self, route):
+        return "http://{}:{}{}".format(self.host, self.port, route)
 
     def __str__(self):
         s_name = "{}:".format(self.name)

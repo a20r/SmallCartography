@@ -1,6 +1,9 @@
 
 import config
+import uuid
 import worker
+import grequests
+from collections import defaultdict
 from flask import request, jsonify
 
 
@@ -20,15 +23,18 @@ def register():
     host = request.form["host"]
     port = request.form["port"]
     w_type = request.form["type"]
-    wkr = worker.make(name, host, port, w_type)
-    config.workers[name] = wkr
+    if not name in config.workers:
+        wkr = worker.make(name, host, port, w_type)
+        config.workers[name] = wkr
 
-    if w_type == worker.WorkerType.MAPPER:
-        config.mappers.add(wkr)
-    elif w_type == worker.WorkerType.REDUCER:
-        config.reducers.add(name)
+        if w_type == worker.WorkerType.MAPPER:
+            config.mappers.append(wkr)
+        elif w_type == worker.WorkerType.REDUCER:
+            config.reducers.append(wkr)
 
-    return jsonify(error=0, message="No error")
+        return jsonify(error=0, message="No error")
+    else:
+        return jsonify(error=1, message="Worker already registered")
 
 
 @config.app.route("/destroy", methods=["POST"])
@@ -63,4 +69,29 @@ def get_robot(name):
 @config.app.route("/count", methods=["POST"])
 def post_word_count():
     text = request.form["text"]
-    return text
+    parts = text.split("\n")
+    task_id = uuid.uuid4()
+    rs = list()
+    for i, part in enumerate(parts):
+        addr = config.mappers[i % len(config.mappers)].get_address("/count")
+        payload = {"id": task_id, "text": part}
+        rs.append(grequests.post(addr, data=payload))
+
+    results = grequests.map(rs)
+    payloads = [list() for _ in config.reducers]
+    for i, res in enumerate(results):
+        payloads[i % len(payloads)].append(res.json())
+
+    rs = list()
+    for reducer, payload in zip(config.reducers, payloads):
+        addr = reducer.get_address("/join")
+        rs.append(grequests.post(addr, data=payload))
+
+    results = grequests.map(rs)
+    words = defaultdict(int)
+    for result in results:
+        word_dict = result.json()
+        for word, num in word_dict.iteritems():
+            words[word] += num
+
+    return jsonify(words)
