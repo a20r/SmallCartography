@@ -11,6 +11,7 @@ class WorkerType(object):
 class Worker(object):
 
     def __init__(self, name, host, port, w_type):
+        self.name = name
         self.host = host
         self.port = port
         self.w_type = w_type
@@ -49,7 +50,7 @@ class Worker(object):
 
     def __repr__(self):
         return "Worker(name={}, host={}, port={}, w_type={})".format(
-            s_name, s_host, s_port, s_type)
+            self.name, self.host, self.port, self.w_type)
 
     def __hash__(self):
         return hash(repr(self))

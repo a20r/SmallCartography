@@ -1,7 +1,6 @@
 
 import config
 import worker
-import time
 from flask import request, jsonify
 
 
@@ -24,9 +23,9 @@ def register():
     wkr = worker.make(name, host, port, w_type)
     config.workers[name] = wkr
 
-    if w_type == workers.WorkerType.MAPPER:
+    if w_type == worker.WorkerType.MAPPER:
         config.mappers.add(wkr)
-    elif w_type == workers.WorkerType.REDUCER:
+    elif w_type == worker.WorkerType.REDUCER:
         config.reducers.add(name)
 
     return jsonify(error=0, message="No error")
@@ -37,9 +36,9 @@ def destroy():
     name = request.form["name"]
     if name in config.workers:
         w_type = config.workers[name].get_type()
-        if w_type == workers.WorkerType.MAPPER:
+        if w_type == worker.WorkerType.MAPPER:
             config.mappers.remove(name)
-        elif w_type == workers.WorkerType.REDUCER:
+        elif w_type == worker.WorkerType.REDUCER:
             config.reducers.remove(name)
 
         return jsonify(error=0, message="No error")
@@ -64,4 +63,4 @@ def get_robot(name):
 @config.app.route("/count", methods=["POST"])
 def post_word_count():
     text = request.form["text"]
-    pass
+    return text

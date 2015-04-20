@@ -1,6 +1,5 @@
 
 import config
-import worker
 import time
 from flask import request, jsonify
 
