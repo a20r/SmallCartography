@@ -5,6 +5,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 import carto
+import pprint
 
 
 def count_test():
@@ -16,4 +17,4 @@ def count_test():
 
 
 if __name__ == "__main__":
-    print count_test()
+    pprint.pprint(count_test())

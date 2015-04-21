@@ -5,6 +5,7 @@ import worker
 import grequests
 from collections import defaultdict
 from flask import request, jsonify
+import json
 
 
 @config.app.route("/beat", methods=["POST"])
@@ -85,7 +86,7 @@ def post_word_count():
     rs = list()
     for reducer, payload in zip(config.reducers, payloads):
         addr = reducer.get_address("/join")
-        rs.append(grequests.post(addr, data=payload))
+        rs.append(grequests.post(addr, data={"words": json.dumps(payload)}))
 
     results = grequests.map(rs)
     words = defaultdict(int)
