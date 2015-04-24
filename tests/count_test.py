@@ -9,7 +9,7 @@ import pprint
 
 
 def count_test():
-    filename = "texts/apsnet.txt"
+    filename = "texts/hamlet.txt"
     host = "localhost"
     port = 8080
     ms = carto.client.MasterStub(host, port)

@@ -39,10 +39,15 @@ class Heart(object):
         self.running = False
 
     def __beat(self):
-        route = self.address + "/beat"
-        payload = {"name": self.name}
-        r = requests.post(route, data=payload)
-        return r
+        try:
+            route = self.address + "/beat"
+            payload = {"name": self.name}
+            r = requests.post(route, data=payload)
+            if r.json()["error"] == 1:
+                self.register()
+            return r
+        except:
+            pass
 
     def __thread_loop(self):
         while self.running:

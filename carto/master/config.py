@@ -9,4 +9,6 @@ reducers = list()
 workers = dict()
 
 # in seconds
-max_time = 1 * 60
+max_time = 3
+
+OMISSION_PROB = 0.1

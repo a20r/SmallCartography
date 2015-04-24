@@ -67,32 +67,140 @@ def get_robot(name):
         return jsonify(error=2, message="The worker has not been registered")
 
 
+def get_mappers():
+    mappers = list()
+    for mapper in config.mappers:
+        wkr = config.workers[mapper.get_name()]
+        if wkr.still_alive(config.max_time):
+            mappers.append(wkr)
+    return mappers
+
+
+def get_reducers():
+    reducers = list()
+    for reducer in config.reducers:
+        wkr = config.workers[reducer.get_name()]
+        if wkr.still_alive(config.max_time):
+            reducers.append(wkr)
+    return reducers
+
+
+def chunks(text, num):
+    parts = text.split("\n")
+    prtn = len(parts) / num
+    # print "portinos", prtn
+    for i in xrange(num):
+        if i < num - 1:
+            yield " ".join(p for p in parts[i * prtn:prtn * (i + 1)])
+        else:
+            yield " ".join(p for p in parts[i * prtn:])
+
+
+def map_task(text, task_id):
+    mappers = get_mappers()
+    map_ids = set()
+    rs = list()
+    payloads = list()
+    for i, part in enumerate(chunks(text, len(mappers))):
+        addr = mappers[i].get_address("/count")
+        payload = {
+            "id": task_id,
+            "map_id": i,
+            "hash": hash(part),
+            "text": part}
+        payloads.append(payload)
+        rs.append(grequests.post(addr, timeout=1, data=payload))
+        map_ids.add(str(i))
+
+    results = grequests.map(rs)
+    total_results = results
+    ret_ids = set()
+    good_mappers = list()
+    for result in results:
+        ret_ids.add(result.json()["map_id"])
+        good_mappers.append(int(result.json()["map_id"]))
+
+    while len(map_ids - ret_ids) > 0:
+        rs = list()
+        cmi = 0
+        mapper_mapping = dict()
+
+        for i in map_ids - ret_ids:
+            payload = payloads[int(i)]
+            good_map_id = good_mappers[cmi % len(good_mappers)]
+            mapper_mapping[good_map_id] = int(payload["map_id"])
+            addr = mappers[good_map_id].get_address("/count")
+            rs.append(grequests.post(addr, timeout=1, data=payload))
+            cmi += 1
+
+        resend_results = grequests.map(rs)
+        fulfilled_reqs = set()
+        for res in resend_results:
+            ret_ids.add(res.json()["map_id"])
+            total_results.append(res)
+            fulfilled_reqs.add(int(res.json()["map_id"]))
+
+        for good_mapper_id in mapper_mapping:
+            if not mapper_mapping[good_mapper_id] in fulfilled_reqs:
+                good_mappers.remove(good_mapper_id)
+
+    return total_results
+
+
+def reduce_task(results):
+    reducers = get_reducers()
+    payloads = list()
+    word_payloads = [list() for _ in reducers]
+    map_ids = set()
+    for i, res in enumerate(results):
+        word_payloads[i % len(word_payloads)].append(res.json()["words"])
+
+    rs = list()
+    red_id = 0
+    for reducer, payload in zip(reducers, word_payloads):
+        addr = reducer.get_address("/join")
+        data = {"words": json.dumps(payload), "red_id": red_id}
+        payloads.append(data)
+        rs.append(grequests.post(addr, timeout=1, data=data))
+        map_ids.add(red_id)
+        red_id += 1
+
+    return grequests.map(rs)
+
+
+def master_reduce(results):
+    words = defaultdict(int)
+    for result in results:
+        word_dict = result.json()["words"]
+        for word, num in word_dict.iteritems():
+            words[word] += num
+    return words
+
+
 @config.app.route("/count", methods=["POST"])
 def post_word_count():
     text = request.form["text"]
-    parts = text.split("\n")
     task_id = uuid.uuid4()
-    rs = list()
-    for i, part in enumerate(parts):
-        addr = config.mappers[i % len(config.mappers)].get_address("/count")
-        payload = {"id": task_id, "text": part}
-        rs.append(grequests.post(addr, data=payload))
-
-    results = grequests.map(rs)
-    payloads = [list() for _ in config.reducers]
-    for i, res in enumerate(results):
-        payloads[i % len(payloads)].append(res.json())
-
-    rs = list()
-    for reducer, payload in zip(config.reducers, payloads):
-        addr = reducer.get_address("/join")
-        rs.append(grequests.post(addr, data={"words": json.dumps(payload)}))
-
-    results = grequests.map(rs)
-    words = defaultdict(int)
-    for result in results:
-        word_dict = result.json()
-        for word, num in word_dict.iteritems():
-            words[word] += num
-
+    map_results = map_task(text, task_id)
+    reduce_results = reduce_task(map_results)
+    words = master_reduce(reduce_results)
     return jsonify(words)
+
+
+@config.app.route("/kill")
+def kill_all():
+    rs = list()
+    for worker in config.workers.values():
+        addr = worker.get_address("/kill")
+        rs.append(grequests.get(addr))
+
+    grequests.map(rs)
+    shutdown_server()
+    return "Server is dead my friend"
+
+
+def shutdown_server():
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+    func()

@@ -18,6 +18,11 @@ def run(host, port, ns_host, ns_port, name):
 
     """
     hb = heart.Heart(name, host, port, ns_host, ns_port, 1)
-    hb.register()
+    while True:
+        try:
+            hb.register()
+            break
+        except:
+            pass
     hb.start()
     config.app.run(host=host, port=int(port), debug=True, use_reloader=False)
